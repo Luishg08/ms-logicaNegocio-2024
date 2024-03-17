@@ -8,57 +8,53 @@ import parseBearerToken from 'parse-bearer-token';
 import {ConfiguracionSeguridad} from '../config/configuracion.seguridad';
 const fetch = require('node-fetch');
 
-export class BasicAuthenticationStrategy implements AuthenticationStrategy {
+export class AuthStrategy implements AuthenticationStrategy {
   name: string = 'auth';
 
   constructor(
     @inject(AuthenticationBindings.METADATA)
-    public metadata: AuthenticationMetadata[],
-  ) { }
+    private metadata: AuthenticationMetadata[],
+  ) {
 
+  }
 
   /**
    * Autenticación de un usuario frente a una acción en la base de datos
-   * @param request la solicitud con el toquen
+   * @param request la solicitud con el token
    * @returns el perfil de usuario, undefined cuando no tiene permiso o un httpError
    */
   async authenticate(request: Request): Promise<UserProfile | undefined> {
-    let token = parseBearerToken(request)
+    let token = parseBearerToken(request);
     if (token) {
-      let idMenu: string = this.metadata[0].options![0]
-      let accion: string = this.metadata[0].options![1]
+      let idMenu: string = this.metadata[0].options![0];
+      let accion: string = this.metadata[0].options![1];
       console.log(this.metadata);
-      //conectar con el ms seguridad
 
       const datos = {token: token, idMenu: idMenu, accion: accion};
-      const urlValidarPermisos = ConfiguracionSeguridad.enlaceMicroservicioSeguridad + "/validar-permisos";
-      fetch(urlValidarPermisos, {
-        method: 'post',
-        body: JSON.stringify(datos),
-        headers: {'Content-Type': 'application/json', 'Authotirzation': `Bearer ${token}`},
-      })
-        .then((res: any) => res.json())
-        .then((json: any) => {
-          console.log("Respuesta ");
-          console.log(json)
-          let continuar: boolean = false
-          console.log("Conectar con el ms seguridad");
-          if (continuar) {
-            let perfil: UserProfile = Object.assign({
-              permitido: "OK"
-            })
-            return perfil
-          } else {
-            return undefined
-          }
-        });
-
-
-
-
-
+      const urlValidarPermisos = `${ConfiguracionSeguridad.enlaceMicroservicioSeguridad}/validar-permisos`;
+      let res = undefined;
+      try {
+        await fetch(urlValidarPermisos, {
+          method: 'post',
+          body: JSON.stringify(datos),
+          headers: {'Content-Type': 'application/json'},
+        }).then((res: any) => res.json())
+          .then((json: any) => {
+            res = json;
+          });
+        if (res) {
+          let perfil: UserProfile = Object.assign({
+            permitido: "OK"
+          });
+          return perfil;
+        } else {
+          return undefined;
+        }
+      } catch (e) {
+        console.log(e);
+        throw new HttpErrors[401]("No se tiene permisos sobre la acción a ejecutar.");
+      }
     }
-    throw new HttpErrors[401]("No es posible ejecutar la acción por falta de un token.")
+    throw new HttpErrors[401]("No es posible ejecutar la acción por falta de un token.");
   }
-
 }
