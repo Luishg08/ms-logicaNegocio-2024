@@ -5,6 +5,9 @@ import {inject} from '@loopback/context';
 import {HttpErrors, Request} from '@loopback/rest';
 import {UserProfile} from '@loopback/security';
 import parseBearerToken from 'parse-bearer-token';
+import {ConfiguracionSeguridad} from '../config/configuracion.seguridad';
+const fetch = require('node-fetch');
+
 export class BasicAuthenticationStrategy implements AuthenticationStrategy {
   name: string = 'auth';
 
@@ -26,18 +29,34 @@ export class BasicAuthenticationStrategy implements AuthenticationStrategy {
       let accion: string = this.metadata[0].options![1]
       console.log(this.metadata);
       //conectar con el ms seguridad
-      console.log("Conectar con el ms seguridad");
+
+      const datos = {token: token, idMenu: idMenu, accion: accion};
+      const urlValidarPermisos = ConfiguracionSeguridad.enlaceMicroservicioSeguridad + "/validar-permisos";
+      fetch(urlValidarPermisos, {
+        method: 'post',
+        body: JSON.stringify(datos),
+        headers: {'Content-Type': 'application/json', 'Authotirzation': `Bearer ${token}`},
+      })
+        .then((res: any) => res.json())
+        .then((json: any) => {
+          console.log("Respuesta ");
+          console.log(json)
+          let continuar: boolean = false
+          console.log("Conectar con el ms seguridad");
+          if (continuar) {
+            let perfil: UserProfile = Object.assign({
+              permitido: "OK"
+            })
+            return perfil
+          } else {
+            return undefined
+          }
+        });
 
 
-      let continuar: boolean = false
-      if (continuar) {
-        let perfil: UserProfile = Object.assign({
-          permitido: "OK"
-        })
-        return perfil
-      } else {
-        return undefined
-      }
+
+
+
     }
     throw new HttpErrors[401]("No es posible ejecutar la acción por falta de un token.")
   }
